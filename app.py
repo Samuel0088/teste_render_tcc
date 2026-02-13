@@ -7,7 +7,7 @@ import os
 
 app = Flask(__name__)
 
-model = load_model("modelo_mobilenet_folhas.h5")
+model = load_model("treinamento_para_servidor.h5")
 
 classes = [
     "acaros_de_duas_manchas",
