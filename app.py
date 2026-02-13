@@ -1,13 +1,16 @@
 from flask import Flask, request, jsonify
-from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing import image
-from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
 import numpy as np
-import os
+from PIL import Image
+import tflite_runtime.interpreter as tflite
 
 app = Flask(__name__)
 
-model = load_model("treinamento_para_servidor.h5")
+# Carrega modelo TFLite
+interpreter = tflite.Interpreter(model_path="modelo.tflite")
+interpreter.allocate_tensors()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 classes = [
     "acaros_de_duas_manchas",
@@ -30,17 +33,18 @@ def home():
 def predict():
     file = request.files["file"]
     
-    img = image.load_img(file, target_size=(160,160))
-    img_array = image.img_to_array(img)
-    img_array = np.expand_dims(img_array, axis=0)
-    img_array = preprocess_input(img_array)
+    img = Image.open(file).resize((160,160))
+    img = np.array(img, dtype=np.float32)
+    img = np.expand_dims(img, axis=0)
+    img = img / 255.0
 
-    prediction = model.predict(img_array)
-    predicted_class = classes[np.argmax(prediction)]
+    interpreter.set_tensor(input_details[0]['index'], img)
+    interpreter.invoke()
 
-    return jsonify({
-        "classe": predicted_class
-    })
+    output = interpreter.get_tensor(output_details[0]['index'])
+    predicted_class = classes[np.argmax(output)]
+
+    return jsonify({"classe": predicted_class})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
